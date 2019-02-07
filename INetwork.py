@@ -18,16 +18,12 @@ from keras.utils.data_utils import get_file
 from keras.utils.layer_utils import convert_all_kernels_in_model
 
 """
-Neural Style Transfer with Keras 2.0.5
-
 Based on:
 https://github.com/fchollet/keras/blob/master/examples/neural_style_transfer.py
 
-Contains few improvements suggested in the paper Improving the Neural Algorithm of Artistic Style
-(http://arxiv.org/abs/1605.04603).
-
------------------------------------------------------------------------------------------------------------------------
 """
+
+# Pulling VGG16 & VGG19 models for both Theano and TensorFlow implementations
 
 THEANO_WEIGHTS_PATH_NO_TOP = 'https://github.com/fchollet/deep-learning-models/releases/download/v0.1/vgg16_weights_th_dim_ordering_th_kernels_notop.h5'
 TF_WEIGHTS_PATH_NO_TOP = 'https://github.com/fchollet/deep-learning-models/releases/download/v0.1/vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5'
@@ -97,9 +93,6 @@ parser.add_argument("--init_image", dest="init_image", default="content", type=s
 parser.add_argument("--pool_type", dest="pool", default="max", type=str,
                     help='Pooling type. Can be "ave" for average pooling or "max" for max pooling')
 
-parser.add_argument('--preserve_color', dest='color', default="False", type=str,
-                    help='Preserve original color in image')
-
 parser.add_argument('--min_improvement', default=0.0, type=float,
                     help='Defines minimum improvement required to continue script')
 
@@ -135,13 +128,12 @@ content_mask_present = args.content_mask is not None
 content_mask_path = args.content_mask
 
 
-color_mask_present = args.color_mask is not None
 
 rescale_image = str_to_bool(args.rescale_image)
 maintain_aspect_ratio = str_to_bool(args.maintain_aspect_ratio)
-preserve_color = str_to_bool(args.color)
 
-# these are the weights of the different loss components
+
+# Here we find the weights that correspond to the different loss components
 content_weight = args.content_weight
 total_variation_weight = args.tv_weight
 
@@ -161,7 +153,7 @@ else:
     for style_weight in args.style_weight:
         style_weights.append(style_weight * args.style_scale)
 
-# Decide pooling function
+# Decide pooling function (we will be sticking with max)
 pooltype = str(args.pool).lower()
 assert pooltype in ["ave", "max"], 'Pooling argument is wrong. Needs to be either "ave" or "max".'
 
@@ -327,13 +319,14 @@ else:
 
 ip = Input(tensor=input_tensor, batch_shape=shape)
 
-# build the VGG16 network with our 3 images as input
 x = Convolution2D(64, (3, 3), activation='relu', name='conv1_1', padding='same')(ip)
 x = Convolution2D(64, (3, 3), activation='relu', name='conv1_2', padding='same')(x)
 x = pooling_func(x)
 
 x = Convolution2D(128, (3, 3), activation='relu', name='conv2_1', padding='same')(x)
 x = Convolution2D(128, (3, 3), activation='relu', name='conv2_2', padding='same')(x)
+if args.model == "vgg19":
+    x = Convolution2D(128, (3, 3), activation='relu', name='conv2_3', padding='same')(x)
 x = pooling_func(x)
 
 x = Convolution2D(256, (3, 3), activation='relu', name='conv3_1', padding='same')(x)
@@ -355,10 +348,12 @@ x = Convolution2D(512, (3, 3), activation='relu', name='conv5_2', padding='same'
 x = Convolution2D(512, (3, 3), activation='relu', name='conv5_3', padding='same')(x)
 if args.model == "vgg19":
     x = Convolution2D(512, (3, 3), activation='relu', name='conv5_4', padding='same')(x)
+    x = Convolution2D(512, (3, 3), activation='relu', name='conv5_5', padding='same')(x)
 x = pooling_func(x)
 
 model = Model(ip, x)
 
+# Pulling pre-trained weights - Transfer learning
 if K.image_dim_ordering() == "th":
     if args.model == "vgg19":
         weights = get_file('vgg19_weights_th_dim_ordering_th_kernels_notop.h5', TH_19_WEIGHTS_PATH_NO_TOP, cache_subdir='models')
@@ -467,8 +462,8 @@ def total_variation_loss(x):
     return K.sum(K.pow(a + b, 1.25))
 
 if args.model == "vgg19":
-    feature_layers = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1', 'conv3_2', 'conv3_3', 'conv3_4',
-                      'conv4_1', 'conv4_2', 'conv4_3', 'conv4_4', 'conv5_1', 'conv5_2', 'conv5_3', 'conv5_4']
+    feature_layers = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv2_3', 'conv3_1', 'conv3_2', 'conv3_3', 'conv3_4',
+                      'conv4_1', 'conv4_2', 'conv4_3', 'conv4_4', 'conv5_1', 'conv5_2', 'conv5_3', 'conv5_4', 'conv5_5']
 else:
     feature_layers = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1', 'conv3_2', 'conv3_3',
                       'conv4_1', 'conv4_2', 'conv4_3', 'conv5_1', 'conv5_2', 'conv5_3']
@@ -513,8 +508,7 @@ for i in range(len(feature_layers) - 1):
     for j in range(nb_style_images):
         sl = sl1[j] - sl2[j]
 
-        # Improvement 4
-        # Geometric weighted scaling of style loss
+
         loss = loss + (style_weights[j] / (2 ** (nb_layers - (i + 1)))) * sl
 
 loss = loss + total_variation_weight * total_variation_loss(combination_image)
@@ -589,21 +583,8 @@ else:
     x = preprocess_image(args.init_image, read_mode=read_mode)
 
 # We require original image if we are to preserve color in YCbCr mode
-if preserve_color:
-    content = imread(base_image_path, mode="YCbCr")
-    content = imresize(content, (img_width, img_height))
 
-    if color_mask_present:
-        if K.image_dim_ordering() == "th":
-            color_mask_shape = (None, None, img_width, img_height)
-        else:
-            color_mask_shape = (None, img_width, img_height, None)
-
-        color_mask = load_mask(args.color_mask, color_mask_shape, return_mask_img=True)
-    else:
-        color_mask = None
-else:
-    color_mask = None
+color_mask = None
 
 num_iter = args.num_iter
 prev_min_val = -1
