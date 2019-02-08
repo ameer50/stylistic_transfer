@@ -325,8 +325,6 @@ x = pooling_func(x)
 
 x = Convolution2D(128, (3, 3), activation='relu', name='conv2_1', padding='same')(x)
 x = Convolution2D(128, (3, 3), activation='relu', name='conv2_2', padding='same')(x)
-if args.model == "vgg19":
-    x = Convolution2D(128, (3, 3), activation='relu', name='conv2_3', padding='same')(x)
 x = pooling_func(x)
 
 x = Convolution2D(256, (3, 3), activation='relu', name='conv3_1', padding='same')(x)
@@ -348,7 +346,6 @@ x = Convolution2D(512, (3, 3), activation='relu', name='conv5_2', padding='same'
 x = Convolution2D(512, (3, 3), activation='relu', name='conv5_3', padding='same')(x)
 if args.model == "vgg19":
     x = Convolution2D(512, (3, 3), activation='relu', name='conv5_4', padding='same')(x)
-    x = Convolution2D(512, (3, 3), activation='relu', name='conv5_5', padding='same')(x)
 x = pooling_func(x)
 
 model = Model(ip, x)
@@ -462,8 +459,8 @@ def total_variation_loss(x):
     return K.sum(K.pow(a + b, 1.25))
 
 if args.model == "vgg19":
-    feature_layers = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv2_3', 'conv3_1', 'conv3_2', 'conv3_3', 'conv3_4',
-                      'conv4_1', 'conv4_2', 'conv4_3', 'conv4_4', 'conv5_1', 'conv5_2', 'conv5_3', 'conv5_4', 'conv5_5']
+    feature_layers = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1', 'conv3_2', 'conv3_3', 'conv3_4',
+                      'conv4_1', 'conv4_2', 'conv4_3', 'conv4_4', 'conv5_1', 'conv5_2', 'conv5_3', 'conv5_4']
 else:
     feature_layers = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1', 'conv3_2', 'conv3_3',
                       'conv4_1', 'conv4_2', 'conv4_3', 'conv5_1', 'conv5_2', 'conv5_3']
