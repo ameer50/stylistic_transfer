@@ -94,9 +94,6 @@ parser.add_argument("--init_image", dest="init_image", default="content", type=s
 parser.add_argument("--pool_type", dest="pool", default="max", type=str,
                     help='Pooling type. Can be "ave" for average pooling or "max" for max pooling')
 
-parser.add_argument('--preserve_color', dest='color', default="False", type=str,
-                    help='Preserve original color in image')
-
 parser.add_argument('--min_improvement', default=0.0, type=float,
                     help='Defines minimum improvement required to continue script')
 
@@ -136,7 +133,7 @@ color_mask_present = args.color_mask is not None
 
 rescale_image = str_to_bool(args.rescale_image)
 maintain_aspect_ratio = str_to_bool(args.maintain_aspect_ratio)
-preserve_color = str_to_bool(args.color)
+
 
 # these are the weights of the different loss components
 content_weight = args.content_weight
@@ -564,21 +561,7 @@ else:
     x = preprocess_image(args.init_image, read_mode=read_mode)
 
 # We require original image if we are to preserve color in YCbCr mode
-if preserve_color:
-    content = imread(base_image_path, mode="YCbCr")
-    content = imresize(content, (img_width, img_height))
-
-    if color_mask_present:
-        if K.image_dim_ordering() == "th":
-            color_mask_shape = (None, None, img_width, img_height)
-        else:
-            color_mask_shape = (None, img_width, img_height, None)
-
-        color_mask = load_mask(args.color_mask, color_mask_shape, return_mask_img=True)
-    else:
-        color_mask = None
-else:
-    color_mask = None
+color_mask = None
 
 num_iter = args.num_iter
 prev_min_val = -1
@@ -601,8 +584,6 @@ for i in range(num_iter):
     # save current generated image
     img = deprocess_image(x.copy())
 
-    if preserve_color and content is not None:
-        img = original_color_transform(content, img, mask=color_mask)
 
     if not rescale_image:
         img_ht = int(img_width * aspect_ratio)
