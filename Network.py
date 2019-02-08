@@ -18,13 +18,12 @@ from keras.utils.data_utils import get_file
 from keras.utils.layer_utils import convert_all_kernels_in_model
 
 """
-Neural Style Transfer with Keras 2.0.5
-
 Based on:
 https://github.com/fchollet/keras/blob/master/examples/neural_style_transfer.py
 
------------------------------------------------------------------------------------------------------------------------
 """
+
+# Pulling VGG16 & VGG19 models for both Theano and TensorFlow implementations
 
 THEANO_WEIGHTS_PATH_NO_TOP = 'https://github.com/fchollet/deep-learning-models/releases/download/v0.1/vgg16_weights_th_dim_ordering_th_kernels_notop.h5'
 TF_WEIGHTS_PATH_NO_TOP = 'https://github.com/fchollet/deep-learning-models/releases/download/v0.1/vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5'
@@ -129,13 +128,12 @@ content_mask_present = args.content_mask is not None
 content_mask_path = args.content_mask
 
 
-color_mask_present = args.color_mask is not None
 
 rescale_image = str_to_bool(args.rescale_image)
 maintain_aspect_ratio = str_to_bool(args.maintain_aspect_ratio)
 
 
-# these are the weights of the different loss components
+# Here we find the weights that correspond to the different loss components
 content_weight = args.content_weight
 total_variation_weight = args.tv_weight
 
@@ -155,7 +153,7 @@ else:
     for style_weight in args.style_weight:
         style_weights.append(style_weight * args.style_scale)
 
-# Decide pooling function
+# Decide pooling function (we will be sticking with max)
 pooltype = str(args.pool).lower()
 assert pooltype in ["ave", "max"], 'Pooling argument is wrong. Needs to be either "ave" or "max".'
 
@@ -321,13 +319,14 @@ else:
 
 ip = Input(tensor=input_tensor, batch_shape=shape)
 
-# build the VGG16 network with our 3 images as input
 x = Convolution2D(64, (3, 3), activation='relu', name='conv1_1', padding='same')(ip)
 x = Convolution2D(64, (3, 3), activation='relu', name='conv1_2', padding='same')(x)
 x = pooling_func(x)
 
 x = Convolution2D(128, (3, 3), activation='relu', name='conv2_1', padding='same')(x)
 x = Convolution2D(128, (3, 3), activation='relu', name='conv2_2', padding='same')(x)
+if args.model == "vgg19":
+    x = Convolution2D(128, (3, 3), activation='relu', name='conv2_3', padding='same')(x)
 x = pooling_func(x)
 
 x = Convolution2D(256, (3, 3), activation='relu', name='conv3_1', padding='same')(x)
@@ -349,10 +348,12 @@ x = Convolution2D(512, (3, 3), activation='relu', name='conv5_2', padding='same'
 x = Convolution2D(512, (3, 3), activation='relu', name='conv5_3', padding='same')(x)
 if args.model == "vgg19":
     x = Convolution2D(512, (3, 3), activation='relu', name='conv5_4', padding='same')(x)
+    x = Convolution2D(512, (3, 3), activation='relu', name='conv5_5', padding='same')(x)
 x = pooling_func(x)
 
 model = Model(ip, x)
 
+# Pulling pre-trained weights - Transfer learning
 if K.image_dim_ordering() == "th":
     if args.model == "vgg19":
         weights = get_file('vgg19_weights_th_dim_ordering_th_kernels_notop.h5', TH_19_WEIGHTS_PATH_NO_TOP, cache_subdir='models')
@@ -386,14 +387,15 @@ shape_dict = dict([(layer.name, layer.output_shape) for layer in model.layers])
 # compute the neural style loss
 # first we need to define 4 util functions
 
-# the gram matrix of an image tensor (feature-wise outer product)
+# Improvement 1
+# the gram matrix of an image tensor (feature-wise outer product) using shifted activations
 def gram_matrix(x):
     assert K.ndim(x) == 3
     if K.image_dim_ordering() == "th":
         features = K.batch_flatten(x)
     else:
         features = K.batch_flatten(K.permute_dimensions(x, (2, 0, 1)))
-    gram = K.dot(features, K.transpose(features))
+    gram = K.dot(features - 1, K.transpose(features - 1))
     return gram
 
 
@@ -459,14 +461,24 @@ def total_variation_loss(x):
         b = K.square(x[:, :img_width - 1, :img_height - 1, :] - x[:, :img_width - 1, 1:, :])
     return K.sum(K.pow(a + b, 1.25))
 
+if args.model == "vgg19":
+    feature_layers = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv2_3', 'conv3_1', 'conv3_2', 'conv3_3', 'conv3_4',
+                      'conv4_1', 'conv4_2', 'conv4_3', 'conv4_4', 'conv5_1', 'conv5_2', 'conv5_3', 'conv5_4', 'conv5_5']
+else:
+    feature_layers = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1', 'conv3_2', 'conv3_3',
+                      'conv4_1', 'conv4_2', 'conv4_3', 'conv5_1', 'conv5_2', 'conv5_3']
 
 # combine these loss functions into a single scalar
 loss = K.variable(0.)
-layer_features = outputs_dict[args.content_layer]  # 'conv5_2' or 'conv4_2'
+layer_features = outputs_dict[args.content_layer]
 base_image_features = layer_features[0, :, :, :]
 combination_features = layer_features[nb_tensors - 1, :, :, :]
 loss = loss + content_weight * content_loss(base_image_features,
                                       combination_features)
+# Improvement 2
+# Use all layers for style feature extraction and reconstruction
+nb_layers = len(feature_layers) - 1
+
 style_masks = []
 if style_masks_present:
     style_masks = mask_paths # If mask present, pass dictionary of masks to style loss
@@ -475,19 +487,29 @@ else:
 
 channel_index = 1 if K.image_dim_ordering() == "th" else -1
 
-feature_layers = ['conv1_1', 'conv2_1', 'conv3_1', 'conv4_1', 'conv5_1']
-for layer_name in feature_layers:
-    layer_features = outputs_dict[layer_name]
-    shape = shape_dict[layer_name]
+# Improvement 3 : Chained Inference without blurring
+for i in range(len(feature_layers) - 1):
+    layer_features = outputs_dict[feature_layers[i]]
+    shape = shape_dict[feature_layers[i]]
     combination_features = layer_features[nb_tensors - 1, :, :, :]
-
     style_reference_features = layer_features[1:nb_tensors - 1, :, :, :]
-    sl = []
+    sl1 = []
     for j in range(nb_style_images):
-        sl.append(style_loss(style_reference_features[j], combination_features, style_masks[j], shape))
+        sl1.append(style_loss(style_reference_features[j], combination_features, style_masks[j], shape))
+
+    layer_features = outputs_dict[feature_layers[i + 1]]
+    shape = shape_dict[feature_layers[i + 1]]
+    combination_features = layer_features[nb_tensors - 1, :, :, :]
+    style_reference_features = layer_features[1:nb_tensors - 1, :, :, :]
+    sl2 = []
+    for j in range(nb_style_images):
+        sl2.append(style_loss(style_reference_features[j], combination_features, style_masks[j], shape))
 
     for j in range(nb_style_images):
-        loss = loss + (style_weights[j] / len(feature_layers)) * sl[j]
+        sl = sl1[j] - sl2[j]
+
+
+        loss = loss + (style_weights[j] / (2 ** (nb_layers - (i + 1)))) * sl
 
 loss = loss + total_variation_weight * total_variation_loss(combination_image)
 
@@ -561,6 +583,7 @@ else:
     x = preprocess_image(args.init_image, read_mode=read_mode)
 
 # We require original image if we are to preserve color in YCbCr mode
+
 color_mask = None
 
 num_iter = args.num_iter
@@ -579,11 +602,13 @@ for i in range(num_iter):
 
     improvement = (prev_min_val - min_val) / prev_min_val * 100
 
-    print('Current loss value:', min_val, " Improvement : %0.3f" % improvement, "%")
+    print("Current loss value:", min_val, " Improvement : %0.3f" % improvement, "%")
     prev_min_val = min_val
     # save current generated image
     img = deprocess_image(x.copy())
 
+    if preserve_color and content is not None:
+        img = original_color_transform(content, img, mask=color_mask)
 
     if not rescale_image:
         img_ht = int(img_width * aspect_ratio)
@@ -594,14 +619,14 @@ for i in range(num_iter):
         print("Rescaling Image to (%d, %d)" % (img_WIDTH, img_HEIGHT))
         img = imresize(img, (img_WIDTH, img_HEIGHT), interp=args.rescale_method)
 
-    fname = result_prefix + '_at_iteration_%d.png' % (i + 1)
+    fname = result_prefix + "_at_iteration_%d.png" % (i + 1)
     imsave(fname, img)
     end_time = time.time()
-    print('Image saved as', fname)
-    print('Iteration %d completed in %ds' % (i + 1, end_time - start_time))
+    print("Image saved as", fname)
+    print("Iteration %d completed in %ds" % (i + 1, end_time - start_time))
 
     if improvement_threshold is not 0.0:
         if improvement < improvement_threshold and improvement is not 0.0:
-            print("Improvement (%f) is less than improvement threshold (%f). Early stopping script." % (
-                improvement, improvement_threshold))
+            print("Improvement (%f) is less than improvement threshold (%f). Early stopping script." %
+                  (improvement, improvement_threshold))
             exit()
