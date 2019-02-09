@@ -8,6 +8,7 @@ Tranfer Learning Approach was used: Weights were obtained from https://github.co
 Style Transfer is a mechanism that allows one to take the style of a particular painting and "repaint" a new image in that same style.
 
 NeuralStyleTransfer.ipynb python notebook file works in conjunction with the INetwork.py python file to load pre-existing weights (derived from the above link) and implement a VGG19 model, which is essentailly a convolutional neural network with many layers. 
+_____________________________________________________________________________________________________________________
 
 ***MY MAJOR MODIFICATIONS***
 
