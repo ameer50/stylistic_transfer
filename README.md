@@ -15,3 +15,7 @@ ________________________________________________________________________________
 My expansion of this work is primarily rooted in quantitative research I performed. I analyzed how many epochs was optimal in terms of achieving an ideal painting with preserved style elements and crisp content elements. I also played around with the weights and chose to implement a max pooling algorithm for the process.
 
 Additional experimentation I performed included feeding in rotated images to the algorithm to observe changes in final painting outputs.
+
+***Changes to 'Improved.py' File***
+
+[Add the changes here]
