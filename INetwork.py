@@ -604,8 +604,7 @@ for i in range(num_iter):
     # save current generated image
     img = deprocess_image(x.copy())
 
-    if preserve_color and content is not None:
-        img = original_color_transform(content, img, mask=color_mask)
+    img = original_color_transform(content, img, mask=color_mask)
 
     if not rescale_image:
         img_ht = int(img_width * aspect_ratio)
