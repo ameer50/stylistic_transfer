@@ -9,7 +9,7 @@ Style Transfer is a mechanism that allows one to take the style of a particular 
 
 NeuralStyleTransfer.ipynb python notebook file works in conjunction with the INetwork.py python file to load pre-existing weights (derived from the above link) and implement a VGG19 model, which is essentailly a convolutional neural network with many layers. 
 
-###MY MAJOR MODIFICATIONS
+***MY MAJOR MODIFICATIONS***
 
 My expansion of this work is primarily rooted in quantitative research I performed. I analyzed how many epochs was optimal in terms of achieving an ideal painting with preserved style elements and crisp content elements. I also played around with the weights and chose to implement a max pooling algorithm for the process.
 
