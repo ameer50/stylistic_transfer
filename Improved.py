@@ -175,7 +175,7 @@ def preprocess_image(image_path, load_dims=False, read_mode="color"):
     global img_width, img_height, img_WIDTH, img_HEIGHT, aspect_ratio
 
     mode = "RGB" if read_mode == "color" else "L"
-    img = imageio.imread(image_path, mode=mode)  # Prevents crashes due to PNG images (ARGB)
+    img = imageio.imread(image_path)  # Prevents crashes due to PNG images (ARGB)
 
     if mode == "L":
         # Expand the 1 channel grayscale to 3 channel grayscale image
@@ -256,10 +256,10 @@ def load_mask(mask_path, shape, return_mask_img=False):
     else:
         _, width, height, channels = shape
 
-    mask = imageio.imread(mask_path, mode="L") # Grayscale mask load
+    mask = imageio.imread(mask_path) # Grayscale mask load
     mask = imageio.imresize(mask, (width, height)).astype('float32')
 
-    # Perform binarization of mask
+    # Perform binarization of maskn
     mask[mask <= 127] = 0
     mask[mask > 128] = 255
 
