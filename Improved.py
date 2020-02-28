@@ -2,8 +2,8 @@ from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
 
-from scipy.misc import imread, imresize, imsave, fromimage, toimage
-
+#from scipy.misc import imread, imresize, imsave, fromimage, toimage
+import imageio
 from scipy.optimize import fmin_l_bfgs_b
 import numpy as np
 import time
@@ -175,7 +175,7 @@ def preprocess_image(image_path, load_dims=False, read_mode="color"):
     global img_width, img_height, img_WIDTH, img_HEIGHT, aspect_ratio
 
     mode = "RGB" if read_mode == "color" else "L"
-    img = imread(image_path, mode=mode)  # Prevents crashes due to PNG images (ARGB)
+    img = imageio.imread(image_path, mode=mode)  # Prevents crashes due to PNG images (ARGB)
 
     if mode == "L":
         # Expand the 1 channel grayscale to 3 channel grayscale image
@@ -197,7 +197,7 @@ def preprocess_image(image_path, load_dims=False, read_mode="color"):
         else:
             img_height = args.img_size
 
-    img = imresize(img, (img_width, img_height)).astype('float32')
+    img = imageio.imresize(img, (img_width, img_height)).astype('float32')
 
     # RGB -> BGR
     img = img[:, :, ::-1]
@@ -246,7 +246,7 @@ def original_color_transform(content, generated, mask=None):
                 if mask[i, j] == 1:
                     generated[i, j, 1:] = content[i, j, 1:]
 
-    generated = fromimage(toimage(generated, mode='YCbCr'), mode='RGB')  # Convert to RGB color space
+    generated = imageio.fromimage(toimage(generated, mode='YCbCr'), mode='RGB')  # Convert to RGB color space
     return generated
 
 
@@ -256,8 +256,8 @@ def load_mask(mask_path, shape, return_mask_img=False):
     else:
         _, width, height, channels = shape
 
-    mask = imread(mask_path, mode="L") # Grayscale mask load
-    mask = imresize(mask, (width, height)).astype('float32')
+    mask = imageio.imread(mask_path, mode="L") # Grayscale mask load
+    mask = imageio.imresize(mask, (width, height)).astype('float32')
 
     # Perform binarization of mask
     mask[mask <= 127] = 0
@@ -614,7 +614,7 @@ for i in range(num_iter):
         img = imresize(img, (img_WIDTH, img_HEIGHT), interp=args.rescale_method)
 
     fname = result_prefix + "_at_iteration_%d.png" % (i + 1)
-    imsave(fname, img)
+    imageio.imsave(fname, img)
     end_time = time.time()
     print("Image saved as", fname)
     print("Iteration %d completed in %ds" % (i + 1, end_time - start_time))
